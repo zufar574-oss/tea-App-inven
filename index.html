@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Чай">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Чай: приёмка и инвентаризация</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+</head>
+<body>
+
+  <!-- Заставка с логотипом (показывается при запуске, ~1 сек) -->
+  <section id="splash" class="screen screen--splash is-active">
+    <img src="assets/logo.png" alt="Клуб чайной культуры" class="logo logo--splash">
+  </section>
+
+  <!-- Экран Старт -->
+  <section id="start" class="screen screen--start">
+    <header class="start__top">
+      <img src="assets/logo.png" alt="Клуб чайной культуры" class="logo logo--start">
+    </header>
+
+    <div class="start__base" id="startBase">
+      <span class="start__base-line">База не загружена</span>
+      <span class="start__base-date"></span>
+    </div>
+
+    <div class="start__actions">
+      <button type="button" class="btn btn--primary" id="btnReception" disabled>
+        ПРИЁМКА
+      </button>
+      <button type="button" class="btn btn--secondary" id="btnInventory" disabled>
+        ИНВЕНТАРКА
+      </button>
+    </div>
+
+    <div class="start__footer">
+      <button type="button" class="link" id="btnUpdateBase">Обновить базу</button>
+
+      <label class="toggle">
+        <input type="checkbox" id="toggleArchived">
+        <span class="toggle__track"></span>
+        <span class="toggle__label">Архивные</span>
+      </label>
+    </div>
+  </section>
+
+  <!-- Скрытый выбор файла для «Обновить базу» -->
+  <input type="file" id="fileInput" accept=".xlsx" hidden>
+
+  <!-- Рабочий экран (Приёмка / Инвентарка) -->
+  <section id="work" class="screen screen--work">
+    <header class="work__head">
+      <button type="button" class="work__back" id="btnWorkBack" aria-label="Назад">‹</button>
+      <span class="work__title" id="workTitle">ПРИЁМКА</span>
+      <span class="work__counter" id="workCounter">0 поз.</span>
+    </header>
+
+    <div class="work__search">
+      <input type="search" id="searchInput" class="search-input"
+             placeholder="Поиск: название или код…"
+             autocomplete="off" autocapitalize="off" autocorrect="off"
+             inputmode="text" spellcheck="false">
+      <div class="search-dropdown" id="searchDropdown"></div>
+    </div>
+
+    <div class="work__body" id="workList"></div>
+
+    <footer class="work__foot">
+      <button type="button" class="btn btn--secondary" id="btnClearList" disabled>
+        Очистить список
+      </button>
+      <button type="button" class="btn btn--primary" id="btnExport" disabled>
+        ЭКСПОРТ
+      </button>
+    </footer>
+  </section>
+
+  <!-- Экран «Готово» (после экспорта акта) -->
+  <section id="done" class="screen screen--done">
+    <div class="done__box">
+      <div class="done__check" aria-hidden="true">✓</div>
+      <h2 class="done__title">Акт сформирован</h2>
+      <p class="done__hint">Файл сохранён в загрузки. Импортируйте его в МойСклад:<br>
+        «Искать» — «По UUID», галочка «Создать новые, если не существуют».<br>
+        Файл повторяет шаблон МойСклада (36 колонок) — колонки сопоставятся сами.</p>
+      <p class="done__file" id="doneFileName"></p>
+      <div class="done__actions">
+        <button type="button" class="btn btn--primary" id="btnDoneDownload">Скачать ещё раз</button>
+        <button type="button" class="btn btn--secondary" id="btnDoneShare">Поделиться</button>
+        <button type="button" class="btn btn--secondary" id="btnDoneCheck">Сверить остатки</button>
+        <button type="button" class="btn btn--secondary" id="btnDoneBack">‹ К списку</button>
+        <button type="button" class="btn btn--secondary" id="btnDoneNew">Новый акт</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Toast (короткие сообщения) -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Оверлей загрузки (Состояние 2) -->
+  <div id="overlay" class="overlay">
+    <div class="overlay__box">
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="overlayText" class="overlay__text">Загружаем базу…</p>
+    </div>
+  </div>
+
+  <!-- Универсальный модал (отчёт / ошибка / подтверждения) -->
+  <div id="modal" class="modal">
+    <div class="modal__box">
+      <h2 id="modalTitle" class="modal__title"></h2>
+      <p id="modalText" class="modal__text"></p>
+      <div id="modalActions" class="modal__actions"></div>
+    </div>
+  </div>
+
+  <!-- Окно количества (выбор товара из базы / правка) -->
+  <div id="qtyModal" class="modal">
+    <div class="modal__box">
+      <h2 id="qtyTitle" class="modal__title"></h2>
+      <p id="qtySub" class="modal__sub"></p>
+      <label class="field">
+        <span class="field__label">Количество</span>
+        <input type="text" id="qtyInput" class="field__input"
+               inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </label>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--secondary" id="qtyCancel">Отмена</button>
+        <button type="button" class="btn btn--primary" id="qtyAdd">Добавить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Окно новой позиции (нет в базе) -->
+  <div id="newPosModal" class="modal">
+    <div class="modal__box">
+      <h2 class="modal__title">Новая позиция</h2>
+      <label class="field">
+        <span class="field__label">Название</span>
+        <input type="text" id="newPosName" class="field__input"
+               autocomplete="off" autocapitalize="off" spellcheck="false">
+      </label>
+      <label class="field">
+        <span class="field__label">Количество</span>
+        <input type="text" id="newPosQty" class="field__input"
+               inputmode="numeric" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="field">
+        <span class="field__label">Ед. изм. (для МойСклад)</span>
+        <input type="text" id="newPosUnit" class="field__input"
+               value="шт" autocomplete="off" spellcheck="false">
+      </label>
+      <p class="modal__hint">Без UUID — в МойСклад уйдёт как новый товар (создастся при импорте)</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--secondary" id="newPosCancel">Отмена</button>
+        <button type="button" class="btn btn--primary" id="newPosAdd">Добавить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Общий объект приложения (заполняется модулями по мере добавления) -->
+  <script>window.TeaApp = window.TeaApp || {};</script>
+
+  <!-- Локальная копия SheetJS (офлайн, без CDN) -->
+  <script src="vendor/xlsx.full.min.js"></script>
+
+  <!-- Порядок подключения важен: storage → data → ui → main -->
+  <script src="js/storage.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+
+  <!-- Регистрация service worker (офлайн / «Добавить на главный экран»).
+       Не регистрируем на file:// — приложение работает двойным кликом без сервера. -->
+  <script>
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () { /* офлайн недоступен — не блокируем приложение */ });
+      });
+    }
+  </script>
+</body>
+</html>
